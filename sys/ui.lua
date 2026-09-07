@@ -13,7 +13,7 @@ function ui.header(title, bg, fg)
   term.setCursorPos(1,1)
   term.write(string.rep(" ", w))
   term.setCursorPos(2,1)
-  term.write(title)
+  term.write(tostring(title):sub(1, math.max(0,w-2)))
 end
 
 function ui.footer(text, bg, fg)
@@ -23,12 +23,12 @@ function ui.footer(text, bg, fg)
   term.setCursorPos(1,h)
   term.write(string.rep(" ", w))
   term.setCursorPos(2,h)
-  term.write(text)
+  term.write(tostring(text):sub(1, math.max(0,w-2)))
 end
 
-function ui.window(x,y,w,h,title)
-  term.setBackgroundColor(colors.lightGray)
-  term.setTextColor(colors.black)
+function ui.window(x,y,w,h,title,bg,fg)
+  term.setBackgroundColor(bg or colors.lightGray)
+  term.setTextColor(fg or colors.black)
   for yy=y,y+h-1 do
     term.setCursorPos(x,yy)
     term.write(string.rep(" ",w))
@@ -38,23 +38,29 @@ function ui.window(x,y,w,h,title)
   term.setCursorPos(x,y)
   term.write(string.rep(" ",w))
   term.setCursorPos(x+2,y)
-  term.write(title or "Window")
+  term.write(tostring(title or "Window"):sub(1,math.max(0,w-3)))
 end
 
-function ui.button(x,y,w,label,active)
-  term.setBackgroundColor(active and colors.blue or colors.gray)
-  term.setTextColor(colors.white)
+-- Backwards compatible with the old 5-argument API.
+function ui.button(x,y,w,label,active,bg,fg)
+  local normalBg = bg or colors.gray
+  local activeBg = bg or colors.blue
+  local text = fg or colors.white
+  term.setBackgroundColor(active and activeBg or normalBg)
+  term.setTextColor(text)
   term.setCursorPos(x,y)
-  term.write(string.rep(" ",w))
-  term.setCursorPos(x+math.max(0,math.floor((w-#label)/2)),y)
-  term.write(label)
+  term.write(string.rep(" ", w))
+  local tx = x + math.max(0,math.floor((w-#tostring(label))/2))
+  term.setCursorPos(tx,y)
+  term.write(tostring(label):sub(1,w))
 end
 
 function ui.message(title,text)
   local w,h = term.getSize()
   local lines = {}
   for line in tostring(text):gmatch("[^\n]+") do table.insert(lines,line) end
-  local bw = math.min(w-4, math.max(24, #title+8))
+  if #lines==0 then lines={""} end
+  local bw = math.min(w-4, math.max(24, #tostring(title)+8))
   for _,line in ipairs(lines) do bw = math.min(w-4, math.max(bw,#line+4)) end
   local bh = math.min(h-2,#lines+5)
   local x = math.floor((w-bw)/2)+1
@@ -68,9 +74,9 @@ function ui.message(title,text)
   end
   ui.button(x+bw-10,y+bh-2,8,"OK",true)
   while true do
-    local e,_,mx,my = os.pullEvent()
+    local e,k,mx,my = os.pullEvent()
     if e=="mouse_click" and mx>=x+bw-10 and mx<x+bw-2 and my==y+bh-2 then return end
-    if e=="key" and _==keys.enter then return end
+    if e=="key" and k==keys.enter then return end
   end
 end
 
