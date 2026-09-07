@@ -1,19 +1,76 @@
 local ui=dofile('/sys/ui.lua')
 local core=dofile('/lib/suslix.lua')
-local function runApp(path) if fs.exists(path) then shell.run(path) else ui.message('SuslixOS','Application missing:\n'..path) end end
-local apps={{'Terminal','/apps/terminal.lua'},{'File Manager','/apps/fileman.lua'},{'Package Center','/apps/packages.lua'},{'Network Center','/apps/network.lua'},{'Rednet Center','/apps/rednet.lua'},{'Device Center','/apps/devices2.lua'},{'System Monitor','/apps/monitor.lua'},{'System Info','/apps/sysinfo.lua'},{'Calculator','/apps/calc.lua'},{'Clock','/apps/clock.lua'},{'Process Manager','/apps/procman.lua'},{'Turtle Control','/apps/turtle.lua'},{'Help Center','/apps/help.lua'},{'Settings','/apps/settings.lua'}}
-local startOpen=false
-local function draw()
- ui.clear(colors.black); local w,h=term.getSize(); term.setBackgroundColor(colors.blue); term.setTextColor(colors.white)
- for y=1,h-2 do term.setCursorPos(1,y); term.write(string.rep(' ',w)) end
- core.center('SUSLIXOS',math.max(2,math.floor(h/2)-3),colors.white); core.center('Opus-inspired desktop for CC:Tweaked',math.max(3,math.floor(h/2)-1),colors.lightBlue); core.center('Desktop • Network • Devices • Apps • Automation',math.max(4,math.floor(h/2)+1),colors.lightGray)
- term.setBackgroundColor(colors.gray); term.setCursorPos(1,h-1); term.write(string.rep(' ',w)); ui.button(2,h-1,10,'START'); ui.button(14,h-1,8,'FILES'); ui.button(24,h-1,8,'NET'); ui.button(34,h-1,10,'APPS'); ui.button(46,h-1,8,'INFO'); term.setCursorPos(math.max(1,w-8),h-1); term.setTextColor(colors.white); term.write(os.date('%H:%M'))
- if startOpen then local mw=math.min(44,w-2); local shown=math.min(#apps,h-5); local mh=shown+3; local x=2; local y=h-mh-2; ui.window(x,y,mw,mh,'SuslixOS Applications')
-  for i=1,shown do term.setBackgroundColor(colors.lightGray); term.setTextColor(colors.black); term.setCursorPos(x+2,y+i); term.write(string.format('%2d. %s',i,apps[i][1])) end return {x=x,y=y,w=mw,shown=shown} end
+local config=dofile('/lib/config.lua')
+
+local apps={
+ {'Terminal','/apps/terminal.lua','CLI'}, {'File Manager','/apps/fileman.lua','FILE'}, {'Package Center','/apps/packages.lua','STORE'},
+ {'Network Center','/apps/network.lua','NET'}, {'Rednet Center','/apps/rednet.lua','RED'}, {'Device Center','/apps/devices2.lua','DEV'},
+ {'System Monitor','/apps/monitor.lua','MON'}, {'System Info','/apps/sysinfo.lua','INFO'}, {'Calculator','/apps/calc.lua','CALC'},
+ {'Clock','/apps/clock.lua','TIME'}, {'Process Manager','/apps/procman.lua','PROC'}, {'Turtle Control','/apps/turtle.lua','TURTLE'},
+ {'Help Center','/apps/help.lua','HELP'}, {'Settings','/apps/settings.lua','SET'}
+}
+local s=config.load(); local menu=false; local appPage=1
+
+local function reload() s=config.load() end
+local function run(path) if fs.exists(path) then shell.run(path) else ui.message('SuslixOS','Application missing:\n'..path) end end
+local function paintLine(y,bg,fg) local w=term.getSize(); term.setBackgroundColor(bg); term.setTextColor(fg); term.setCursorPos(1,y); term.write(string.rep(' ',w)) end
+local function clockText()
+ if s.clock24=='true' then return os.date('%H:%M') end
+ return os.date('%I:%M %p'):gsub('^0','')
 end
+
+local function draw()
+ reload(); local c=config.colors(s.theme); local w,h=term.getSize(); ui.clear(c.bg)
+ -- wallpaper
+ if s.wallpaper=='grid' then
+  term.setBackgroundColor(c.bg); term.setTextColor(c.muted)
+  for y=2,h-3,2 do term.setCursorPos(1,y); term.write(string.rep('.',w)) end
+ elseif s.wallpaper=='lines' then
+  term.setBackgroundColor(c.bg); term.setTextColor(c.muted)
+  for x=8,w,8 do for y=2,h-3 do term.setCursorPos(x,y); term.write('|') end end
+ end
+ paintLine(1,c.surface,c.text); term.setCursorPos(2,1); term.write('SUSLIXOS')
+ term.setTextColor(c.muted); term.setCursorPos(11,1); term.write('Desktop')
+ if s.showClock=='true' then term.setCursorPos(math.max(1,w-12),1); term.setTextColor(c.text); term.write(clockText()) end
+
+ -- shortcuts
+ local cols=w>=70 and 4 or 3; local cellw=math.max(14,math.floor((w-2)/cols)); local maxRows=math.max(1,math.floor((h-6)/4)); local maxApps=math.min(#apps,maxRows*cols)
+ for i=1,maxApps do
+  local a=apps[i]; local col=(i-1)%cols; local row=math.floor((i-1)/cols); local x=2+col*cellw; local y=3+row*4
+  term.setBackgroundColor(c.surface); term.setTextColor(c.text); term.setCursorPos(x,y); term.write(string.rep(' ',math.min(cellw-1,12)))
+  term.setCursorPos(x+1,y); term.write(a[3]:sub(1,math.min(#a[3],cellw-3)))
+  term.setBackgroundColor(c.bg); term.setTextColor(c.text); term.setCursorPos(x,y+1); term.write(a[1]:sub(1,cellw-2))
+ end
+
+ -- dock
+ local dockY=h-2; paintLine(dockY,c.panel,c.text); ui.button(2,dockY,9,'START',menu,c.text); ui.button(13,dockY,8,'FAV',false,c.text); ui.button(23,dockY,8,'NET',false,c.text); ui.button(33,dockY,8,'INFO',false,c.text); ui.button(43,dockY,10,'SETTINGS',false,c.text)
+ if menu then
+  local mw=math.min(42,w-2); local mh=math.min(h-5,#apps+3); local x=2; local y=dockY-mh; ui.window(x,y,mw,mh,'Applications')
+  local first=math.max(1,math.min(#apps,appPage)); local shown=math.min(#apps,mh-3); for i=1,shown do local idx=((first+i-2)%#apps)+1; term.setBackgroundColor(c.panel); term.setTextColor(c.text); term.setCursorPos(x+2,y+i); term.write(string.format('%2d  %s',idx,apps[idx][1])) end
+ end
+end
+
 while true do
- local menu=draw(); local e,a,x,y=os.pullEvent()
+ draw(); local e,a,x,y=os.pullEvent()
  if e=='terminate' then return end
- if e=='key' then if a==keys.leftAlt then startOpen=not startOpen elseif a==keys.f2 then runApp('/apps/terminal.lua') elseif a==keys.f3 then runApp('/apps/fileman.lua') elseif a==keys.f4 then runApp('/apps/network.lua') elseif a==keys.f5 then runApp('/apps/packages.lua') elseif a==keys.f6 then runApp('/apps/devices2.lua') elseif a==keys.f1 then runApp('/apps/help.lua') end
- elseif (e=='mouse_click' or e=='monitor_touch') and x and y then local _,hh=term.getSize(); if y==hh-1 then if x>=2 and x<=11 then startOpen=not startOpen elseif x>=14 and x<=21 then startOpen=false;runApp('/apps/fileman.lua') elseif x>=24 and x<=31 then startOpen=false;runApp('/apps/network.lua') elseif x>=34 and x<=43 then startOpen=false;runApp('/apps/packages.lua') elseif x>=46 and x<=53 then startOpen=false;runApp('/apps/sysinfo.lua') end elseif startOpen and menu and x>=menu.x+2 and x<=menu.x+menu.w-2 then local n=y-menu.y; if n>=1 and n<=menu.shown then startOpen=false;runApp(apps[n][2]) end end end
+ if e=='key' then
+  if a==keys.leftAlt then menu=not menu
+  elseif a==keys.f1 then run('/apps/help.lua')
+  elseif a==keys.f2 then run('/apps/terminal.lua')
+  elseif a==keys.f3 then run('/apps/fileman.lua')
+  elseif a==keys.f4 then run('/apps/network.lua')
+  elseif a==keys.f5 then run('/apps/packages.lua')
+  elseif a==keys.f6 then run('/apps/devices2.lua')
+  elseif a==keys.f7 then run('/apps/settings.lua')
+  elseif a==keys.f8 then run('/apps/bookmarks.lua')
+ end
+ elseif (e=='mouse_click' or e=='monitor_touch') and x and y then
+  local w,h=term.getSize()
+  if y==h-2 then
+   if x>=2 and x<=10 then menu=not menu elseif x>=13 and x<=20 then menu=false;run('/apps/bookmarks.lua') elseif x>=23 and x<=30 then menu=false;run('/apps/network.lua') elseif x>=33 and x<=40 then menu=false;run('/apps/sysinfo.lua') elseif x>=43 and x<=52 then menu=false;run('/apps/settings.lua') end
+  elseif menu and y>=h-2-math.min(h-5,#apps+3)+1 and x>=4 then local mh=math.min(h-5,#apps+3); local row=y-(h-2-mh); local shown=math.min(#apps,mh-3); if row>=1 and row<=shown then local idx=((math.max(1,math.min(#apps,appPage))+row-2)%#apps)+1; menu=false;run(apps[idx][2]) end
+  else
+   local cols=w>=70 and 4 or 3; local cellw=math.max(14,math.floor((w-2)/cols)); if y>=3 then local col=math.floor((x-2)/cellw); local row=math.floor((y-3)/4); local idx=row*cols+col+1; if idx<=math.min(#apps, math.max(1,math.floor((h-6)/4))*cols) and x>=2+col*cellw then run(apps[idx][2]) end end
+  end
+ end
 end
