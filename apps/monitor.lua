@@ -1,4 +1,9 @@
 local ui=dofile("/sys/ui.lua")
+local function countType(t)
+  local n=0
+  for _ in peripheral.find(t) do n=n+1 end
+  return n
+end
 local function draw()
   ui.clear(colors.black)
   ui.header("System Monitor")
@@ -15,15 +20,15 @@ local function draw()
     "Free space: "..tostring(free),
     "Total space: "..tostring(total),
     "Fuel (turtle): "..(turtle and tostring(turtle.getFuelLevel()) or "N/A"),
-    "Modems: "..#peripheral.find("modem"),
-    "Printers: "..#peripheral.find("printer"),
-    "Speakers: "..#peripheral.find("speaker"),
-    "Monitors: "..#peripheral.find("monitor"),
+    "Modems: "..countType("modem"),
+    "Printers: "..countType("printer"),
+    "Speakers: "..countType("speaker"),
+    "Monitors: "..countType("monitor"),
   }
   for i,row in ipairs(rows) do
     term.setCursorPos(2,i+2); term.write(row)
   end
-  ui.footer("R refresh   Q back")
+  ui.footer("Q back")
 end
 while true do
   draw()
