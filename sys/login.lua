@@ -1,27 +1,76 @@
-local ui=dofile('/sys/ui.lua')
-local users=dofile('/lib/users.lua')
+local function loadModule(path)
+  local f=fs.open(path,'r')
+  if not f then error('Missing system file: '..path) end
+  local src=f.readAll()
+  f.close()
+  local fn,err=load(src,path)
+  if not fn then error(err) end
+  return fn()
+end
+
+local ui=loadModule('/sys/ui.lua')
+local users=loadModule('/lib/users.lua')
+
 while true do
   local list=users.list()
-  term.setBackgroundColor(colors.black); term.clear(); term.setCursorPos(1,1)
+  term.setBackgroundColor(colors.black)
+  term.clear()
+  term.setCursorPos(1,1)
   ui.header('Welcome to SuslixOS',colors.blue,colors.white)
-  term.setCursorPos(3,3); term.setTextColor(colors.lightGray); term.write('Choose a user')
-  if #list==0 then users.add('Owner',''); list=users.list() end
-  for i,u in ipairs(list) do
-    term.setCursorPos(4,4+i); term.setTextColor(colors.white); term.write(string.format('%d  %s',i,u.name))
+  term.setCursorPos(3,3)
+  term.setTextColor(colors.lightGray)
+  term.write('Choose a user')
+
+  if #list==0 then
+    users.add('Owner','')
+    list=users.list()
   end
+
+  for i,u in ipairs(list) do
+    term.setCursorPos(4,4+i)
+    term.setTextColor(colors.white)
+    term.write(string.format('%d  %s',i,u.name))
+  end
+
   local base=6+#list
-  term.setCursorPos(3,base); term.setTextColor(colors.cyan); term.write('N  New user')
-  term.setCursorPos(3,base+1); term.setTextColor(colors.lightGray); term.write('R  Restart   Q  Shutdown')
-  local e,k=os.pullEvent('key')
+  term.setCursorPos(3,base)
+  term.setTextColor(colors.cyan)
+  term.write('N  New user')
+  term.setCursorPos(3,base+1)
+  term.setTextColor(colors.lightGray)
+  term.write('R  Restart   Q  Shutdown')
+
+  local _,k=os.pullEvent('key')
+
   if k==keys.n then
-    term.setCursorPos(3,base+3); term.setTextColor(colors.white); write('Name: '); local name=read()
-    term.setCursorPos(3,base+4); write('Password (empty = none): '); local pw=read('*')
-    if name~='' then users.add(name,pw) end
+    term.setCursorPos(3,base+3)
+    term.setTextColor(colors.white)
+    write('Name: ')
+    local name=read()
+    term.setCursorPos(3,base+4)
+    write('Password (empty = none): ')
+    local pw=read('*')
+    if name and name~='' then users.add(name,pw) end
+
   elseif k>=keys.one and k<=keys.nine then
-    local idx=k-keys.zero; local u=list[idx]
+    local idx=k-keys.zero
+    local u=list[idx]
     if u then
-      term.setCursorPos(3,base+3); term.setTextColor(colors.white); write('Password: '); local pw=read('*')
-      if users.check(u.id,pw) then users.setCurrent(u.id); return true else ui.message('Sign in failed','Wrong password.') end
+      term.setCursorPos(3,base+3)
+      term.setTextColor(colors.white)
+      write('Password: ')
+      local pw=read('*')
+      if users.check(u.id,pw) then
+        users.setCurrent(u.id)
+        return true
+      else
+        ui.message('Sign in failed','Wrong password.')
+      end
     end
-  elseif k==keys.r then os.reboot() elseif k==keys.q then os.shutdown() end
+
+  elseif k==keys.r then
+    os.reboot()
+  elseif k==keys.q then
+    os.shutdown()
+  end
 end
