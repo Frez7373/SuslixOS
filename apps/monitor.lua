@@ -1,8 +1,6 @@
 local ui=dofile("/sys/ui.lua")
 local function countType(t)
-  local n=0
-  for _ in peripheral.find(t) do n=n+1 end
-  return n
+  return select("#", peripheral.find(t))
 end
 local function draw()
   ui.clear(colors.black)
@@ -28,7 +26,7 @@ local function draw()
   for i,row in ipairs(rows) do
     term.setCursorPos(2,i+2); term.write(row)
   end
-  ui.footer("Q back")
+  ui.footer("R refresh   Q back")
 end
 while true do
   draw()
